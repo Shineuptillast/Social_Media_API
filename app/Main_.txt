@@ -1,0 +1,283 @@
+try:
+    conn = psycopg2.connect(host='localhost', database='Fastapi',
+                            user='postgres', password='1234', cursor_factory=RealDictCursor)
+    cursor = conn.cursor()
+    print("Database connection was successfull")
+except Exception as e:
+    print("Error in connecting {}".format(e))
+    time.sleep(2)
+
+my_post = [{"title": "title of post 1", "content": "content of post 1", "id": 1}, {
+    "title": "title of post 2", "content": "content of post 2", "id": 2}]  # for storing all the posts data
+
+
+def find_post(op):
+    for o in my_post:
+        print(o["id"])
+        if o['id'] == op:
+            return o
+    return -1
+
+
+class Post(BaseModel):
+    title: str
+    content: str
+    published: bool = True  # default value
+
+
+# Request Get Method url: "/"
+
+
+@ app.get("/")
+def root():
+    return {"message": "This is the first FASTAPI"}
+
+
+# Path operations
+@ app.get("/post")
+def get_posts():
+    cursor.execute("""select * from posts""")
+    posts1 = cursor.fetchall()
+    return {"data": posts1}
+
+
+@ app.post("/calculate")
+def calculate():
+    return {"Sum": "This is the post request"}
+
+# post request while using request data and sending the response to the user
+
+
+@ app.post("/firstpost")
+def firstpost(payLoad: dict = Body(...)):
+    print(payLoad)
+    return {"new_title": "{}".format(payLoad["title"]), "new_content": "{}".format(payLoad["content"])}
+
+
+# title str, content str(want these two things from the user)
+
+
+@ app.post("/schemapost")
+def firstpost(new_post: Post):
+    print(new_post)
+    print(new_post.title)
+    print(new_post.content)
+    """return {"title": "{}".format(new_post.title), "content": "{}".format(new_post.content), "Published": "{}".format(new_post.published), "Rating": "{}".format(new_post.rating)}"""
+    return {"data": new_post}
+
+
+@app.post("/createpost", status_code=status.HTTP_201_CREATED)
+def create_post(new_po: Post):
+    cursor.execute("Insert into posts (title, content, published) values (%s , %s, %s) returning *",
+                   (new_po.title, new_po.content, new_po.published))
+    new_cursor = cursor.fetchone()
+    conn.commit()
+
+    """post_dic = new_po.dict()
+    post_dic["id"] = randrange(0, 1000000)
+    my_post.append(post_dic)
+    print(my_post)"""
+    return {"data": new_cursor}
+
+
+@app.get("/posts/{id}")
+# automatic type conversion and throw an informative error during type conversion
+def get_post(id: int, respose: Response):
+
+    cursor.execute(f"""select * from posts where id = %s""", (str(id)))
+    my_post = cursor.fetchone()
+    if my_post is None:
+        respose.status_code = status.HTTP_404_NOT_FOUND
+        return {"data": "Not Present"}
+    else:
+        return {"data": my_post}
+    # data = find_post(id)
+    # print(data)
+    # if data == -1:
+    # """respose.status_code = status.HTTP_404_NOT_FOUND"""
+    # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+    #                    detail=f"post with id {id} was not found")
+    # else:
+    #  return {"Data": f"{data}"}
+
+# Deletion of data by id
+
+
+@app.delete("/post_delete/{id}")
+def delete_post(id: int, response: Response):
+    cursor.execute(
+        """delete from posts where id = %s returning *""", (str(id),))
+    delete_post = cursor.fetchone()
+    conn.commit()
+    if delete_post != None:
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"Deleted data": delete_post}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_204_NO_CONTENT)
+    # data = find_post(id)
+    # if data != -1:
+    # my_post.remove(data)
+    # response.status_code = status.HTTP_202_ACCEPTED
+    # return {"deleted"}
+    # else:
+    # raise HTTPException(
+    # status_code=status.HTTP_204_NO_CONTENT, detail="Not found")
+
+
+# Update data of specific id
+@app.put("/update_post/{id}")
+def update_post(id: int, post: Post, response: Response):
+    cursor.execute("""Update posts set title = %s, content = %s, published = %s where id = %s returning *""",
+                   (post.title, post.content, post.published, str(id)))
+    conn.commit()
+    updated_post = cursor.fetchone()
+    if updated_post:
+        response = status.HTTP_200_OK
+        return {"updated_post": updated_post}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+    # data = find_post(id)
+    # if data != -1:
+        # print(data)
+       # post = post.dict()
+        # data["title"] = post["title"]
+        # data["content"] = post["content"]
+        # response = status.HTTP_200_OK
+        # return {"Message": "Updatedpost"}
+   # else:
+       # raise HTTPException(
+        #   status_code=status.HTTP_404_NOT_FOUND, detail="NOT found")
+
+"""@ app.get("/")
+def root():
+    return {"message": "This is the first FASTAPI"}
+
+
+# Path operations
+@ app.get("/post")
+def get_posts():
+    cursor.execute("select * from posts")
+    posts1 = cursor.fetchall()
+    return {"data": posts1}"""
+
+
+"""@ app.post("/calculate")
+def calculate():
+    return {"Sum": "This is the post request"}
+
+# post request while using request data and sending the response to the user
+
+
+@ app.post("/firstpost")
+def firstpost(payLoad: dict = Body(...)):
+    print(payLoad)
+    return {"new_title": "{}".format(payLoad["title"]), "new_content": "{}".format(payLoad["content"])}
+"""
+
+# title str, content str(want these two things from the user)
+
+
+"""@ app.post("/schemapost")
+def firstpost(new_post: Post):
+    print(new_post)
+    print(new_post.title)
+    print(new_post.content)
+    return {"title": "{}".format(new_post.title), "content": "{}".format(new_post.content), "Published": "{}".format(new_post.published), "Rating": "{}".format(new_post.rating)}
+    return {"data": new_post}"""
+
+
+"""@app.post("/createpost", status_code=status.HTTP_201_CREATED)
+def create_post(new_po: Post):
+    cursor.execute("Insert into posts (title, content, published) values (%s , %s, %s) returning *",
+                   (new_po.title, new_po.content, new_po.published))
+    new_cursor = cursor.fetchone()
+    conn.commit()
+
+    post_dic = new_po.dict()
+post_dic["id"] = randrange(0, 1000000)
+my_post.append(post_dic)
+print(my_post)
+    return {"data": new_cursor}"""
+
+
+"""@app.get("/posts/{id}")
+# automatic type conversion and throw an informative error during type conversion
+def get_post(id: int, respose: Response):
+
+    cursor.execute(f"select * from posts where id = %s", (str(id)))
+    my_post = cursor.fetchone()
+    if my_post is None:
+        respose.status_code = status.HTTP_404_NOT_FOUND
+        return {"data": "Not Present"}
+    else:
+        return {"data": my_post}
+
+
+@app.delete("/post_delete/{id}")
+def delete_post(id: int, response: Response):
+    cursor.execute(
+        "delete from posts where id = %s returning * ", (str(id),))
+    delete_post = cursor.fetchone()
+    conn.commit()
+    if delete_post != None:
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"Deleted data": delete_post}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_204_NO_CONTENT)"""
+
+
+# Update data of specific id
+"""@app.put("/update_post/{id}")
+def update_post(id: int, post: Post, response: Response):
+    cursor.execute("Update posts set title = %s, content = %s, published = %s where id = %s returning * ",
+                   (post.title, post.content, post.published, str(id)))
+    conn.commit()
+    updated_post = cursor.fetchone()
+    if updated_post:
+        response = status.HTTP_200_OK
+        return {"updated_post": updated_post}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")"""
+
+
+"""@app.get("/sqlalchemy", response_model=List[Schemas])
+def test_posts(db: Session = Depends(get_db)):
+    posts = db.query(models.Post).all()
+    return posts"""
+
+
+""""""
+
+
+"""@app.get("/get/{id}", response_model=Schemas)
+def get_id(id: int, db: Session = Depends(get_db)):
+
+    post = db.query(models.Post).filter(models.Post.id == id).first()
+
+    return post"""
+
+
+"""@app.delete("/delete/{id}")
+def delete_post(id: int, post: Post, db: Session = Depends(get_db)):
+
+    post = db.query(models.Post).filter(models.Post.id == id)
+
+    post.delete(synchronize_session=False)
+    db.commit()
+    return {"Deleted"}"""
+
+"""
+
+@app.put("/update/{id}", response_model=Schemas)
+def update_id(id: int, db: Session = Depends(get_db)):
+    post_query = db.query(models.Post).filter(models.Post.id == id)
+
+    post_query.update({'title': 'hey this is updated title',
+                      'content': 'Hello'}, synchronize_session=False)
+    db.commit()
+    return "Successfull""""
